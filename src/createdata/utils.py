@@ -1,14 +1,29 @@
 import sys
 
-import requests
 from bs4 import BeautifulSoup
+from playwright.sync_api import sync_playwright
 
 
 def make_soup(url: str) -> BeautifulSoup:
-    source_code = requests.get(url, allow_redirects=False)
-    plain_text = source_code.text.encode("ascii", "replace")
-    return BeautifulSoup(plain_text, "html.parser")
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
 
+        page = browser.new_page(
+            user_agent=(
+                "Mozilla/5.0 (X11; Linux x86_64) "
+                "AppleWebKit/537.36 "
+                "(KHTML, like Gecko) "
+                "Chrome/138 Safari/537.36"
+            )
+        )
+
+        page.goto(url, wait_until="networkidle", timeout=120000)
+
+        html = page.content()
+
+        browser.close()
+
+    return BeautifulSoup(html, "html.parser")
 
 def print_progress(
     iteration: int,

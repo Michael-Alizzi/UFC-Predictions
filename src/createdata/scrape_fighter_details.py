@@ -97,11 +97,13 @@ class FighterDetailsScraper:
                 if name in new_fighters
             }
 
-        # dump all_event_links as PAST_EVENT_LINKS
-        with open(self.PAST_FIGHTER_LINKS_PICKLE_PATH.as_posix(), "wb") as f:
-            pickle.dump(all_fighter_links, f)
-
         return new_fighter_links, all_fighter_links
+
+    def _save_fighter_links(self):
+        # mark fighters as scraped only once their details are safely on disk;
+        # dumping earlier poisons the cache if the run is interrupted
+        with open(self.PAST_FIGHTER_LINKS_PICKLE_PATH.as_posix(), "wb") as f:
+            pickle.dump(self.all_fighter_links, f)
 
     def _get_fighter_data_task(self, fighter_name, fighter_url):
         another_soup = make_soup(fighter_url)
@@ -178,8 +180,8 @@ class FighterDetailsScraper:
 
         df = (
             pd.DataFrame(fighter_name_and_details)
-            .T.replace("--", value=np.NaN)
-            .replace("", value=np.NaN)
+            .T.replace("--", value=np.nan)
+            .replace("", value=np.nan)
         )
         df.columns = self.HEADER
 
@@ -212,9 +214,10 @@ class FighterDetailsScraper:
                 self.FIGHTER_DETAILS_PATH, index_col="fighter_name"
             )
 
-            fighter_details_df = new_fighter_details_df.append(
-                old_fighter_details_df, ignore_index=False
+            fighter_details_df = pd.concat(
+                [new_fighter_details_df, old_fighter_details_df]
             )
 
         fighter_details_df.to_csv(self.FIGHTER_DETAILS_PATH, index_label="fighter_name")
+        self._save_fighter_links()
         print(f'Successfully scraped and saved ufc fighter data to {self.FIGHTER_DETAILS_PATH}\n')

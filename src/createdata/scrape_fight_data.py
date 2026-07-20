@@ -37,6 +37,7 @@ class FightDataScraper:
 
         if not new_events_and_fight_links:
             if self.TOTAL_EVENT_AND_FIGHTS_PATH.exists():
+                ufc_links.save_event_links()
                 print(f'No new fight data to scrape at the moment, loaded existing data from {self.TOTAL_EVENT_AND_FIGHTS_PATH}.')
                 return
             else:
@@ -49,8 +50,8 @@ class FightDataScraper:
                 new_events_and_fight_links, filepath=self.NEW_EVENT_AND_FIGHTS_PATH
             )
 
-            new_event_and_fights_data = pd.read_csv(self.NEW_EVENT_AND_FIGHTS_PATH)
-            old_event_and_fights_data = pd.read_csv(self.TOTAL_EVENT_AND_FIGHTS_PATH)
+            new_event_and_fights_data = pd.read_csv(self.NEW_EVENT_AND_FIGHTS_PATH, sep=";")
+            old_event_and_fights_data = pd.read_csv(self.TOTAL_EVENT_AND_FIGHTS_PATH, sep=";")
 
             assert len(new_event_and_fights_data.columns) == len(
                 old_event_and_fights_data.columns
@@ -60,14 +61,18 @@ class FightDataScraper:
                 list(old_event_and_fights_data.columns)
             ]
 
-            latest_total_fight_data = new_event_and_fights_data.append(
-                old_event_and_fights_data, ignore_index=True
+            latest_total_fight_data = pd.concat(
+                [new_event_and_fights_data, old_event_and_fights_data],
+                ignore_index=True,
             )
-            latest_total_fight_data.to_csv(self.TOTAL_EVENT_AND_FIGHTS_PATH, index=None)
+            latest_total_fight_data.to_csv(
+                self.TOTAL_EVENT_AND_FIGHTS_PATH, index=None, sep=";"
+            )
 
             os.remove(self.NEW_EVENT_AND_FIGHTS_PATH)
             print("Removed new event and fight files")
 
+        ufc_links.save_event_links()
         print("Successfully scraped and saved ufc fight data!\n")
 
     def _scrape_raw_fight_data(
