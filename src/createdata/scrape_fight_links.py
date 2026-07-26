@@ -38,11 +38,13 @@ class UFCLinks:
             # Find links of the newer events
             new_event_links = list(set(all_event_links) - set(past_event_links))
 
-        # dump all_event_links as PAST_EVENT_LINKS
-        with open(self.PAST_EVENT_LINKS_PICKLE_PATH.as_posix(), "wb") as f:
-            pickle.dump(all_event_links, f)
-
         return new_event_links, all_event_links
+
+    def save_event_links(self):
+        # mark events as scraped only once their fight data is safely on disk;
+        # dumping earlier poisons the cache if the run is interrupted
+        with open(self.PAST_EVENT_LINKS_PICKLE_PATH.as_posix(), "wb") as f:
+            pickle.dump(self.all_event_links, f)
 
     def get_event_and_fight_links(self) -> (Dict, Dict):
         def get_fight_links(event_links: List[str]) -> Dict[str, List[str]]:
@@ -54,7 +56,11 @@ class UFCLinks:
 
             for index, link in enumerate(event_links):
                 event_fights = []
-                soup = make_soup(link)
+                try:
+                    soup = make_soup(link)
+                except Exception:
+                    print(f"Failed: {link}")
+                    raise
                 for row in soup.findAll(
                     "tr",
                     {
@@ -71,17 +77,20 @@ class UFCLinks:
 
         new_events_and_fight_links = {}
         if self.EVENT_AND_FIGHT_LINKS_PICKLE_PATH.exists():
+            with open(
+                self.EVENT_AND_FIGHT_LINKS_PICKLE_PATH.as_posix(), "rb"
+            ) as pickle_in:
+                all_events_and_fight_links = pickle.load(pickle_in)
+
             if not self.new_event_links:
-                with open(
-                    self.EVENT_AND_FIGHT_LINKS_PICKLE_PATH.as_posix(), "rb"
-                ) as pickle_in:
-                    all_events_and_fight_links = pickle.load(pickle_in)
-
                 return new_events_and_fight_links, all_events_and_fight_links
-            else:
-                new_events_and_fight_links = get_fight_links(self.new_event_links)
 
-        all_events_and_fight_links = get_fight_links(self.all_event_links)
+            # only scrape the new events, reuse cached links for the rest
+            new_events_and_fight_links = get_fight_links(self.new_event_links)
+            all_events_and_fight_links.update(new_events_and_fight_links)
+        else:
+            all_events_and_fight_links = get_fight_links(self.all_event_links)
+
         with open(self.EVENT_AND_FIGHT_LINKS_PICKLE_PATH.as_posix(), "wb") as f:
             pickle.dump(all_events_and_fight_links, f)
 

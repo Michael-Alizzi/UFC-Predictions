@@ -355,9 +355,9 @@ class Preprocessor:
         self.store = self.store.join(frame, how="outer")
 
     def _create_fighter_age(self):
-        self.store["R_DOB"] = pd.to_datetime(self.store["R_DOB"])
-        self.store["B_DOB"] = pd.to_datetime(self.store["B_DOB"])
-        self.store["date"] = pd.to_datetime(self.store["date"])
+        self.store["R_DOB"] = pd.to_datetime(self.store["R_DOB"], errors="coerce")
+        self.store["B_DOB"] = pd.to_datetime(self.store["B_DOB"], errors="coerce")
+        self.store["date"] = pd.to_datetime(self.store["date"], errors="coerce")
 
         def get_age(row):
             B_age = (row["date"] - row["B_DOB"]).days
@@ -382,7 +382,8 @@ class Preprocessor:
     def _fill_nas(self):
         self.store["R_Reach_cms"].fillna(self.store["R_Height_cms"], inplace=True)
         self.store["B_Reach_cms"].fillna(self.store["B_Height_cms"], inplace=True)
-        self.store.fillna(self.store.median(), inplace=True)
+        self.store.fillna(self.store.median(numeric_only=True), inplace=True,
+)
 
         self.store["R_Stance"].fillna("Orthodox", inplace=True)
         self.store["B_Stance"].fillna("Orthodox", inplace=True)

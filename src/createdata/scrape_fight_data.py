@@ -37,6 +37,7 @@ class FightDataScraper:
 
         if not new_events_and_fight_links:
             if self.TOTAL_EVENT_AND_FIGHTS_PATH.exists():
+                ufc_links.save_event_links()
                 print(f'No new fight data to scrape at the moment, loaded existing data from {self.TOTAL_EVENT_AND_FIGHTS_PATH}.')
                 return
             else:
@@ -49,8 +50,8 @@ class FightDataScraper:
                 new_events_and_fight_links, filepath=self.NEW_EVENT_AND_FIGHTS_PATH
             )
 
-            new_event_and_fights_data = pd.read_csv(self.NEW_EVENT_AND_FIGHTS_PATH)
-            old_event_and_fights_data = pd.read_csv(self.TOTAL_EVENT_AND_FIGHTS_PATH)
+            new_event_and_fights_data = pd.read_csv(self.NEW_EVENT_AND_FIGHTS_PATH, sep=";")
+            old_event_and_fights_data = pd.read_csv(self.TOTAL_EVENT_AND_FIGHTS_PATH, sep=";")
 
             assert len(new_event_and_fights_data.columns) == len(
                 old_event_and_fights_data.columns
@@ -60,14 +61,18 @@ class FightDataScraper:
                 list(old_event_and_fights_data.columns)
             ]
 
-            latest_total_fight_data = new_event_and_fights_data.append(
-                old_event_and_fights_data, ignore_index=True
+            latest_total_fight_data = pd.concat(
+                [new_event_and_fights_data, old_event_and_fights_data],
+                ignore_index=True,
             )
-            latest_total_fight_data.to_csv(self.TOTAL_EVENT_AND_FIGHTS_PATH, index=None)
+            latest_total_fight_data.to_csv(
+                self.TOTAL_EVENT_AND_FIGHTS_PATH, index=None, sep=";"
+            )
 
             os.remove(self.NEW_EVENT_AND_FIGHTS_PATH)
             print("Removed new event and fight files")
 
+        ufc_links.save_event_links()
         print("Successfully scraped and saved ufc fight data!\n")
 
     def _scrape_raw_fight_data(
@@ -135,7 +140,18 @@ class FightDataScraper:
     @classmethod
     def _get_fight_stats(cls, fight_soup: BeautifulSoup) -> str:
         tables = fight_soup.findAll("tbody")
-        total_fight_data = [tables[0], tables[2]]
+        # The fight-totals row has 10 cells and the significant-strikes row 9.
+        # Per-round tables share those cell counts but come later on the page,
+        # and their number varies with rounds fought, so positional indexing
+        # (tables[0], tables[2]) picks the wrong table on current pages.
+        def first_table_with(n_tds):
+            return next(
+                t
+                for t in tables
+                if t.find("tr") and len(t.find("tr").findAll("td")) == n_tds
+            )
+
+        total_fight_data = [first_table_with(10), first_table_with(9)]
         fight_stats = []
         for table in total_fight_data:
             row = table.find("tr")

@@ -141,7 +141,7 @@ class FighterDetailProcessor:
                 if len(s) != 0:
                     pass
                 else:
-                    s.loc[len(s)] = [np.NaN for _ in s.columns]
+                    s.loc[len(s)] = [np.nan for _ in s.columns]
                 s["total_rounds_fought"] = fighter_slice["last_round"].sum()
                 s["total_title_bouts"] = fighter_slice[
                     fighter_slice["title_bout"] == True
@@ -160,13 +160,13 @@ class FighterDetailProcessor:
 
                 if fighter_index is None:
                     if index in fighter_blue.index:
-                        temp_blue_frame = temp_blue_frame.append(s)
+                        temp_blue_frame = pd.concat([temp_blue_frame, s], ignore_index=True)
                     elif index in fighter_red.index:
-                        temp_red_frame = temp_red_frame.append(s)
+                        temp_red_frame = pd.concat([temp_red_frame, s], ignore_index=True)
                 elif fighter_index == "blue":
-                    temp_blue_frame = temp_blue_frame.append(s)
+                    temp_blue_frame = pd.concat([temp_blue_frame, s], ignore_index=True)
                 elif fighter_index == "red":
-                    temp_red_frame = temp_red_frame.append(s)
+                    temp_red_frame = pd.concat([temp_red_frame, s], ignore_index=True)
 
         return temp_red_frame, temp_blue_frame
 
@@ -255,7 +255,7 @@ class FighterDetailProcessor:
     def _convert_height_reach_to_cms(self):
         def convert_to_cms(X):
 
-            if X is np.NaN:
+            if X is np.nan:
                 return X
 
             elif len(X.split("'")) == 2:
@@ -275,7 +275,7 @@ class FighterDetailProcessor:
 
     def _convert_weight_to_pounds(self):
         self.fighter_details["Weight_lbs"] = self.fighter_details["Weight"].apply(
-            lambda X: float(X.replace(" lbs.", "")) if X is not np.NaN else X
+            lambda X: float(X.replace(" lbs.", "")) if X is not np.nan else X
         )
         self.fighter_details.drop(["Height", "Weight", "Reach"], axis=1, inplace=True)
 
