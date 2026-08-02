@@ -1,0 +1,24 @@
+name: Tapology probe
+
+# Manually-triggered fact-finding run: can Tapology be scraped from a CI
+# runner, and what location fields do its fighter pages expose? See
+# scripts/tapology_probe.py. Always green -- read the log for the verdict.
+on:
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install requests beautifulsoup4
+
+      - name: Probe Tapology
+        run: python scripts/tapology_probe.py
