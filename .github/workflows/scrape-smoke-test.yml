@@ -1,0 +1,44 @@
+name: Scraper smoke test
+
+# Manually-triggered live test of the ufcstats scraper + Wikidata
+# nationality lookup. Runs on Actions because runners have unrestricted
+# outbound network (the Claude Code environments used for development
+# allowlist neither ufcstats.com nor wikidata.org).
+on:
+  workflow_dispatch:
+    inputs:
+      full:
+        description: "Also run the full fighter scrape (slow) and upload the CSV"
+        type: boolean
+        default: false
+
+jobs:
+  scrape-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.9"
+
+      # The scraper only needs these four; requirements.txt pins a full
+      # 2020-era app stack that no longer resolves cleanly. <2 pins keep
+      # np.NaN / DataFrame.append working in the untouched scraper code.
+      - name: Install scraper dependencies
+        run: pip install "pandas<2" "numpy<2" requests beautifulsoup4
+
+      - name: Live smoke test (ufcstats + Wikidata)
+        run: python scripts/scrape_smoke_test.py
+
+      - name: Full fighter scrape
+        if: ${{ inputs.full }}
+        run: python scripts/scrape_smoke_test.py --full
+
+      - name: Upload scraped CSV
+        if: ${{ inputs.full }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: raw_fighter_details
+          path: data/raw_fighter_details.csv
