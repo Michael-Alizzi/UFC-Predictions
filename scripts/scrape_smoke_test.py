@@ -48,17 +48,21 @@ def preflight():
     """Show what ufcstats actually returns for the raw URL variants, so a
     parse failure in the steps below is diagnosable from the CI log alone."""
     import requests
+    from src.createdata.utils import _HEADERS
     print("=== preflight: raw responses ===")
-    for url in (
-        "http://ufcstats.com/statistics/fighters?char=t&page=all",
-        "https://www.ufcstats.com/statistics/fighters?char=t&page=all",
+    for url, headers in (
+        ("http://ufcstats.com/statistics/fighters?char=t&page=all", None),
+        ("http://ufcstats.com/statistics/fighters?char=t&page=all", _HEADERS),
+        ("http://www.ufcstats.com/statistics/fighters?char=t&page=all", _HEADERS),
     ):
+        ua = "browser-UA" if headers else "default-UA"
         try:
-            r = requests.get(url, allow_redirects=False, timeout=30)
-            print(f"  {url}\n    -> {r.status_code} "
-                  f"location={r.headers.get('location')} bytes={len(r.text)}")
+            r = requests.get(url, headers=headers, timeout=30)
+            body = " ".join(r.text.split())  # collapse whitespace for one-line log
+            print(f"  {url} [{ua}]\n    -> {r.status_code} bytes={len(r.text)} "
+                  f"final_url={r.url}\n    body[:500]: {body[:500]!r}")
         except Exception as e:
-            print(f"  {url}\n    -> ERROR {e}")
+            print(f"  {url} [{ua}]\n    -> ERROR {e}")
     print()
 
 
