@@ -19,8 +19,13 @@ HEADERS = {
 }
 TIMEOUT = 15
 
+# Two-tier disambiguation: strongly prefer entities described as MMA
+# fighters; only fall back to the broader combat-sports match when no MMA
+# hit exists. The broad pattern alone once matched a 19th-century British
+# boxer namesake ahead of the UFC's Robert Whittaker.
+MMA_DESC = re.compile(r"mixed martial|MMA|UFC", re.IGNORECASE)
 FIGHTER_DESC = re.compile(
-    r"mixed martial|MMA|fighter|martial artist|kickboxer|boxer|wrestler|judoka|grappler",
+    r"fighter|martial artist|kickboxer|boxer|wrestler|judoka|grappler",
     re.IGNORECASE,
 )
 
@@ -47,9 +52,11 @@ def _find_fighter_entity(name: str):
             "limit": 5,
         }
     )
-    for hit in data.get("search", []):
-        if FIGHTER_DESC.search(hit.get("description") or ""):
-            return hit["id"]
+    hits = data.get("search", [])
+    for pattern in (MMA_DESC, FIGHTER_DESC):
+        for hit in hits:
+            if pattern.search(hit.get("description") or ""):
+                return hit["id"]
     return None
 
 
