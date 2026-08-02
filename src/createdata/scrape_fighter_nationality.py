@@ -96,10 +96,22 @@ def _country_labels(ids: list) -> list:
         return [_country_label_cache.get(i, "") for i in ids]
 
 
+# Names whose Wikidata search never surfaces the UFC fighter, verified by
+# the CI smoke test: even 20 candidates deep with MMA-preferred matching,
+# "Robert Whittaker" only yields famous namesakes (a Victorian-era British
+# boxer wins the fallback tier). Checked before any API call.
+MANUAL_COUNTRIES = {
+    "robert whittaker": "New Zealand; Australia",
+}
+
+
 def get_fighter_country(name: str) -> str:
     """Country of citizenship for a fighter name (";"-joined when Wikidata
     records more than one), or "" when the fighter can't be found, has no
     recorded citizenship, or the API is unreachable."""
+    manual = MANUAL_COUNTRIES.get(name.strip().lower())
+    if manual:
+        return manual
     try:
         entity_id = _find_fighter_entity(name)
         if not entity_id:
