@@ -44,6 +44,24 @@ KNOWN_FIGHTERS = {
 }
 
 
+def preflight():
+    """Show what ufcstats actually returns for the raw URL variants, so a
+    parse failure in the steps below is diagnosable from the CI log alone."""
+    import requests
+    print("=== preflight: raw responses ===")
+    for url in (
+        "http://ufcstats.com/statistics/fighters?char=t&page=all",
+        "https://www.ufcstats.com/statistics/fighters?char=t&page=all",
+    ):
+        try:
+            r = requests.get(url, allow_redirects=False, timeout=30)
+            print(f"  {url}\n    -> {r.status_code} "
+                  f"location={r.headers.get('location')} bytes={len(r.text)}")
+        except Exception as e:
+            print(f"  {url}\n    -> ERROR {e}")
+    print()
+
+
 def smoke_ufcstats():
     print("=== ufcstats.com: listing page + fighter pages ===")
     scraper = FighterDetailsScraper()
@@ -105,6 +123,7 @@ if __name__ == "__main__":
     if args.full:
         full_scrape()
     else:
+        preflight()
         smoke_ufcstats()
         smoke_wikidata()
     print("SMOKE TEST PASSED")

@@ -4,8 +4,20 @@ import requests
 from bs4 import BeautifulSoup
 
 
+# Some hosts serve bot-default user agents an empty/blocked page
+_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/120.0 Safari/537.36"
+    )
+}
+
+
 def make_soup(url: str) -> BeautifulSoup:
-    source_code = requests.get(url, allow_redirects=False)
+    # Follow redirects: ufcstats redirects http:// to https:// (and bare to
+    # www.), and the old allow_redirects=False returned the empty redirect
+    # body, silently scraping nothing.
+    source_code = requests.get(url, headers=_HEADERS, timeout=30)
     plain_text = source_code.text.encode("ascii", "replace")
     return BeautifulSoup(plain_text, "html.parser")
 
