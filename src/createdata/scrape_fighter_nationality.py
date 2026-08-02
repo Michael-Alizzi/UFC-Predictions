@@ -49,7 +49,10 @@ def _find_fighter_entity(name: str):
             "search": name,
             "language": "en",
             "type": "item",
-            "limit": 5,
+            # 20, not 5: common names bury the MMA fighter below namesakes
+            # (ecologists, cricketers, Victorian boxers) in search ranking --
+            # the MMA-preferred tier can only pick from hits it can see.
+            "limit": 20,
         }
     )
     hits = data.get("search", [])
