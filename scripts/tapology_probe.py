@@ -95,18 +95,78 @@ def probe_fighter(name):
     return True
 
 
+def dump_details(url):
+    """Fetch a fighter page and print its location-relevant detail lines."""
+    r, blocked = fetch(url)
+    if blocked:
+        return False
+    soup = BeautifulSoup(r.text, "html.parser")
+    text = soup.get_text("\n", strip=True)
+    interesting = re.compile(
+        r"^(Given Name|Nickname|Born|Fighting out of|Nationality|Age|"
+        r"Date of Birth|Height|Reach|Weight Class|Affiliation)\b", re.I)
+    lines, seen = [], set()
+    it = iter(text.split("\n"))
+    for line in it:
+        if interesting.match(line) and line not in seen:
+            value = line if ":" in line and line.split(":", 1)[1].strip() \
+                else f"{line.rstrip(':')}: {next(it, '')}"
+            lines.append(value)
+            seen.add(line)
+    print("  details:")
+    for line in lines[:14]:
+        print(f"    {line}")
+    return bool(lines)
+
+
 def main():
-    print("=== Tapology probe ===")
-    _, blocked = fetch(BASE + "/")
+    print("=== Tapology probe v2 ===")
+    r, blocked = fetch(BASE + "/")
     if blocked:
         print("\nVERDICT: Tapology serves a bot challenge to this network -- "
               "not scrapeable from CI with plain requests.")
         return
+
+    # Round 1 showed the homepage is served but /search is Cloudflare-gated.
+    # So: check robots/sitemap for a search-free discovery path, and test
+    # whether fighter PAGES are served by following links from the homepage.
+    print("\n--- robots.txt ---")
+    rr, _ = fetch(BASE + "/robots.txt")
+    if rr.status_code == 200:
+        print("  " + " | ".join(rr.text.splitlines()[:30]))
+
+    print("\n--- sitemap ---")
+    for path in ("/sitemap.xml", "/sitemap.xml.gz", "/sitemaps/sitemap.xml"):
+        sr, sblocked = fetch(BASE + path)
+        if sr.status_code == 200 and not sblocked:
+            print("  first 800 chars: " + " ".join(sr.text.split())[:800])
+            break
+
+    print("\n--- fighter links on homepage ---")
+    soup = BeautifulSoup(r.text, "html.parser")
+    fighter_links = sorted({a["href"] for a in soup.find_all("a", href=True)
+                            if "/fightcenter/fighters/" in a["href"]})
+    print(f"  {len(fighter_links)} distinct fighter links; sample: {fighter_links[:5]}")
+
     ok = 0
-    for name in PANEL:
+    for href in fighter_links[:3]:
+        url = href if href.startswith("http") else BASE + href
         print()
-        ok += bool(probe_fighter(name))
-    print(f"\nVERDICT: fighter pages parsed for {ok}/{len(PANEL)} panel names")
+        ok += bool(dump_details(url))
+
+    # Does a warmed session (homepage cookies) change the search verdict?
+    print("\n--- search with warmed session ---")
+    s = requests.Session()
+    s.headers.update(HEADERS)
+    s.get(BASE + "/", timeout=30)
+    sr = s.get(BASE + "/search", params={"term": "Ilia Topuria",
+                                          "mainSearchFilter": "fighters"}, timeout=30)
+    print(f"  -> {sr.status_code} bytes={len(sr.text)} "
+          f"{'still challenged' if 'Just a moment' in sr.text or sr.status_code == 403 else 'OK'}")
+
+    print(f"\nVERDICT: fighter pages readable: {ok}/3 sampled; "
+          "search endpoint: " +
+          ("blocked" if sr.status_code == 403 else "open"))
 
 
 if __name__ == "__main__":
