@@ -72,6 +72,10 @@ class Preprocessor:
         return fights_df, fighter_details_df
 
     def _drop_future_fighter_details_columns(self):
+        # "Country" (Wikidata-sourced nationality) is exported for downstream
+        # consumers of raw_fighter_details.csv but not used by this repo's own
+        # preprocessed dataset; errors="ignore" keeps this working on CSVs
+        # written before that column existed.
         self.fighter_details.drop(
             columns=[
                 "SLpM",
@@ -82,8 +86,10 @@ class Preprocessor:
                 "TD_Acc",
                 "TD_Def",
                 "Sub_Avg",
+                "Country",
             ],
             inplace=True,
+            errors="ignore",
         )
 
     def _rename_columns(self):

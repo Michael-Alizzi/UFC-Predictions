@@ -6,6 +6,7 @@ from typing import Dict, List
 import numpy as np
 import pandas as pd
 
+from src.createdata.scrape_fighter_nationality import get_fighter_country
 from src.createdata.utils import make_soup, print_progress
 
 from src.createdata.data_files_path import (  # isort:skip
@@ -185,6 +186,41 @@ class FighterDetailsScraper:
 
         return df
 
+    def _backfill_missing_countries(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Fill the Wikidata-sourced Country column for any fighter missing
+        one: newly scraped fighters, and every row of a CSV written before
+        this column existed. ufcstats.com itself carries no nationality, so
+        this is a separate lookup pass rather than part of the page scrape.
+        Failed lookups stay NaN and are simply retried on the next run."""
+        if "Country" not in df.columns:
+            # object dtype, not float NaN: newer pandas refuses to assign
+            # strings into a float64 column
+            df["Country"] = pd.Series(np.nan, index=df.index, dtype=object)
+
+        missing = [
+            name
+            for name, country in df["Country"].items()
+            if pd.isna(country) or country == ""
+        ]
+        if not missing:
+            return df
+
+        l = len(missing)
+        print(f"Looking up nationality for {l} fighters on Wikidata: ")
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+            futures = {
+                name: executor.submit(get_fighter_country, name) for name in missing
+            }
+            print_progress(0, l, prefix="Progress:", suffix="Complete")
+            for idx_progress, (name, future) in enumerate(futures.items()):
+                country = future.result()
+                if country:
+                    df.loc[name, "Country"] = country
+                print_progress(idx_progress + 1, l, prefix="Progress:", suffix="Complete")
+
+        return df
+
     def create_fighter_data_csv(self) -> None:
 
         print("Getting fighter urls \n")
@@ -197,6 +233,15 @@ class FighterDetailsScraper:
         if not self.new_fighter_links:
             if self.FIGHTER_DETAILS_PATH.exists():
                 print(f'No new fighter data to scrape at the moment, loaded existing data from {self.FIGHTER_DETAILS_PATH}.')
+                fighter_details_df = pd.read_csv(
+                    self.FIGHTER_DETAILS_PATH, index_col="fighter_name"
+                )
+                fighter_details_df = self._backfill_missing_countries(
+                    fighter_details_df
+                )
+                fighter_details_df.to_csv(
+                    self.FIGHTER_DETAILS_PATH, index_label="fighter_name"
+                )
                 return
             else:
                 self._get_fighter_name_and_details(self.all_fighter_links)
@@ -215,6 +260,8 @@ class FighterDetailsScraper:
             fighter_details_df = new_fighter_details_df.append(
                 old_fighter_details_df, ignore_index=False
             )
+
+        fighter_details_df = self._backfill_missing_countries(fighter_details_df)
 
         fighter_details_df.to_csv(self.FIGHTER_DETAILS_PATH, index_label="fighter_name")
         print(f'Successfully scraped and saved ufc fighter data to {self.FIGHTER_DETAILS_PATH}\n')
